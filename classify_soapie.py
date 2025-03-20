@@ -2,16 +2,18 @@ import sys
 import json
 from transformers import pipeline
 
-# Load pipeline untuk text classification
+# Load pipeline untuk klasifikasi teks
 classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-# Ambil teks dari argumen
-text = sys.argv[1]
+# Ambil teks transkripsi dari argumen
+input_json = sys.argv[1]
+data = json.loads(input_json)
+text = data["text"]
 
 # Daftar kategori SOAPIE
 soapie_labels = ["Subjective", "Objective", "Assessment", "Plan", "Instruksi", "Evaluasi"]
 
-# Klasifikasikan teks ke dalam kategori SOAPIE
+# Klasifikasikan teks
 result = classifier(text, candidate_labels=soapie_labels)
 
 # Format hasil sebagai dictionary

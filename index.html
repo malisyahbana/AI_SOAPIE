@@ -12,8 +12,7 @@
   <h1 class="text-center mb-4">Form SOAPIE - Rekam Suara dan Input Data</h1>
 
   <form id="soapieForm" class="card p-4 shadow-sm">
-    <!-- Indikator Status Rekaman -->
-    <div id="recordStatus" class="alert alert-info text-center d-none">Merekam...</div>
+    <div id="recordStatus" class="alert alert-info text-center d-none">Merekam... <span id="recordTimer">0s</span></div>
 
     <div class="mb-3">
       <label class="form-label">Subjektif:</label>
@@ -49,53 +48,51 @@
       <textarea class="form-control" name="evaluasi" id="evaluasi" rows="3" placeholder="Masukkan evaluasi"></textarea>
     </div>
 
-
     <div class="mb-3">
       <h3>Rekam Suara:</h3>
       <button type="button" id="recordBtn" class="btn btn-primary">🎤 Mulai Rekam</button>
       <button type="button" id="stopBtn" class="btn btn-danger" disabled>⏹️ Stop Rekam</button>
     </div>
 
-    <!-- Player untuk memutar ulang rekaman -->
     <audio id="audioPlayer" class="mt-3 d-none" controls></audio>
-
-    <!-- Loader saat mengunggah -->
     <div id="uploadStatus" class="alert alert-warning text-center mt-3 d-none">Mengunggah rekaman...</div>
-
-    <!-- Hasil transkripsi -->
     <div class="alert alert-success mt-3 d-none" id="transcriptionResult">
       <strong>Hasil Transkripsi:</strong> <span id="transcribedText"></span>
     </div>
   </form>
 
   <script>
-    let recorder, mediaStream, audioChunks = [];
+    let recorder, mediaStream, audioChunks = [], timer, seconds = 0;
 
-    // Tombol mulai rekam
     document.getElementById("recordBtn").onclick = function () {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(function (stream) {
           mediaStream = stream;
           recorder = new MediaRecorder(stream);
+          audioChunks = [];
 
           recorder.ondataavailable = function (event) {
             audioChunks.push(event.data);
           };
 
-          audioChunks = [];
           recorder.start();
-
-          // Ubah status UI
           document.getElementById("recordBtn").disabled = true;
           document.getElementById("stopBtn").disabled = false;
           document.getElementById("recordStatus").classList.remove("d-none");
+
+          // Timer rekaman
+          seconds = 0;
+          document.getElementById("recordTimer").textContent = "0s";
+          timer = setInterval(() => {
+            seconds++;
+            document.getElementById("recordTimer").textContent = seconds + "s";
+          }, 1000);
         })
         .catch(function (err) {
-          alert("Error: " + err);
+          alert("Gagal mengakses mikrofon: " + err);
         });
     };
 
-    // Tombol stop rekam
     document.getElementById("stopBtn").onclick = function () {
       if (recorder) {
         recorder.stop();
@@ -105,22 +102,21 @@
         document.getElementById("stopBtn").disabled = true;
         document.getElementById("recordStatus").classList.add("d-none");
 
+        clearInterval(timer);
+
         recorder.onstop = function () {
           let audioBlob = new Blob(audioChunks, { type: "audio/wav" });
           let audioURL = URL.createObjectURL(audioBlob);
 
-          // Tampilkan audio player
           let audioPlayer = document.getElementById("audioPlayer");
           audioPlayer.src = audioURL;
           audioPlayer.classList.remove("d-none");
 
-          // Upload rekaman ke backend
           uploadAudio(audioBlob);
         };
       }
     };
 
-    // Fungsi untuk mengunggah audio ke backend
     function uploadAudio(audioBlob) {
       let formData = new FormData();
       formData.append("audio_file", audioBlob, "recorded_audio.wav");
@@ -135,11 +131,14 @@
         .then(data => {
           document.getElementById("uploadStatus").classList.add("d-none");
 
-          // Tampilkan hasil transkripsi
+          if (data.error) {
+            alert("❌ Kesalahan: " + data.error);
+            return;
+          }
+
           document.getElementById("transcriptionResult").classList.remove("d-none");
           document.getElementById("transcribedText").innerText = data.transcribed_text;
 
-          // Isi otomatis form SOAPIE berdasarkan hasil AI
           if (data.soapie_classification) {
             document.getElementById("subjective").value = data.soapie_classification.Subjective || "";
             document.getElementById("objective").value = data.soapie_classification.Objective || "";
@@ -150,7 +149,7 @@
           }
         })
         .catch(error => {
-          alert("Gagal mengunggah rekaman: " + error);
+          alert("❌ Gagal mengunggah rekaman: " + error);
         });
     }
   </script>
