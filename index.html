@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Form SOAPIE Dokter</title>
+  </head>
+  <body>
+    <h1>Form SOAPIE - Rekam Suara dan Input Data</h1>
+
+    <!-- Form untuk memasukkan data SOAPIE -->
+    <form
+      id="soapieForm"
+      action="psoapie.php"
+      method="POST"
+      enctype="multipart/form-data"
+    >
+      <h3>Subjektif:</h3>
+      <textarea
+        name="subjective"
+        rows="4"
+        cols="50"
+        placeholder="Masukkan data subjektif"
+      ></textarea
+      ><br /><br />
+
+      <h3>Objektif:</h3>
+      <textarea
+        name="objective"
+        rows="4"
+        cols="50"
+        placeholder="Masukkan data objektif"
+      ></textarea
+      ><br /><br />
+
+      <h3>Penilaian:</h3>
+      <textarea
+        name="assessment"
+        rows="4"
+        cols="50"
+        placeholder="Masukkan penilaian"
+      ></textarea
+      ><br /><br />
+
+      <h3>Rencana:</h3>
+      <textarea
+        name="plan"
+        rows="4"
+        cols="50"
+        placeholder="Masukkan rencana tindakan"
+      ></textarea
+      ><br /><br />
+
+      <h3>Rekam Suara:</h3>
+      <button type="button" id="recordBtn">Mulai Rekam Suara</button>
+      <input
+        type="file"
+        name="audio_file"
+        id="audioFile"
+        style="display: none"
+      /><br /><br />
+
+      <button type="submit">Kirim Data</button>
+    </form>
+
+    <script>
+      // Script untuk merekam suara dan mengirim file audio ke server
+      let recorder;
+      let audioData = [];
+
+      document.getElementById("recordBtn").onclick = function () {
+        // Akses mikrofon
+        navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then(function (stream) {
+            recorder = new MediaRecorder(stream);
+            recorder.ondataavailable = function (event) {
+              audioData.push(event.data);
+            };
+            recorder.onstop = function () {
+              // Mengonversi audio yang direkam menjadi file WAV
+              const audioBlob = new Blob(audioData, { type: "audio/wav" });
+              const audioFile = new File([audioBlob], "recorded_audio.wav", {
+                type: "audio/wav",
+              });
+
+              // Kirim file audio ke form
+              const formData = new FormData();
+              formData.append("audio_file", audioFile);
+
+              // Masukkan file audio ke input form
+              const inputFile = document.getElementById("audioFile");
+              inputFile.files = new FileList();
+              inputFile.files = inputFile.files.concat(audioFile);
+            };
+
+            recorder.start();
+          })
+          .catch(function (err) {
+            console.error("Error accessing microphone: " + err);
+          });
+      };
+    </script>
+  </body>
+</html>
