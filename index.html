@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Form SOAPIE Dokter</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -12,6 +12,9 @@
   <h1 class="text-center mb-4">Form SOAPIE - Rekam Suara dan Input Data</h1>
 
   <form id="soapieForm" class="card p-4 shadow-sm">
+    <!-- Indikator Status Rekaman -->
+    <div id="recordStatus" class="alert alert-info text-center d-none">Merekam...</div>
+
     <div class="mb-3">
       <label class="form-label">Subjektif:</label>
       <textarea class="form-control" name="subjective" id="subjective" rows="3"
@@ -31,6 +34,11 @@
     </div>
 
     <div class="mb-3">
+      <label class="form-label">Rencana:</label>
+      <textarea class="form-control" name="plan" id="plan" rows="3" placeholder="Masukkan rencana tindakan"></textarea>
+    </div>
+
+    <div class="mb-3">
       <label class="form-label">Instruksi:</label>
       <textarea class="form-control" name="instruksi" id="instruksi" rows="3"
         placeholder="Masukkan instruksi"></textarea>
@@ -41,23 +49,29 @@
       <textarea class="form-control" name="evaluasi" id="evaluasi" rows="3" placeholder="Masukkan evaluasi"></textarea>
     </div>
 
-    <div class="mb-3">
-      <label class="form-label">Rencana:</label>
-      <textarea class="form-control" name="plan" id="plan" rows="3" placeholder="Masukkan rencana tindakan"></textarea>
-    </div>
 
     <div class="mb-3">
       <h3>Rekam Suara:</h3>
-      <button type="button" id="recordBtn" class="btn btn-primary">Mulai Rekam</button>
-      <button type="button" id="stopBtn" class="btn btn-danger" disabled>Stop Rekam</button>
+      <button type="button" id="recordBtn" class="btn btn-primary">🎤 Mulai Rekam</button>
+      <button type="button" id="stopBtn" class="btn btn-danger" disabled>⏹️ Stop Rekam</button>
+    </div>
+
+    <!-- Player untuk memutar ulang rekaman -->
+    <audio id="audioPlayer" class="mt-3 d-none" controls></audio>
+
+    <!-- Loader saat mengunggah -->
+    <div id="uploadStatus" class="alert alert-warning text-center mt-3 d-none">Mengunggah rekaman...</div>
+
+    <!-- Hasil transkripsi -->
+    <div class="alert alert-success mt-3 d-none" id="transcriptionResult">
+      <strong>Hasil Transkripsi:</strong> <span id="transcribedText"></span>
     </div>
   </form>
 
   <script>
-    let recorder;
-    let audioChunks = [];
-    let mediaStream;
+    let recorder, mediaStream, audioChunks = [];
 
+    // Tombol mulai rekam
     document.getElementById("recordBtn").onclick = function () {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(function (stream) {
@@ -70,22 +84,75 @@
 
           audioChunks = [];
           recorder.start();
+
+          // Ubah status UI
           document.getElementById("recordBtn").disabled = true;
           document.getElementById("stopBtn").disabled = false;
+          document.getElementById("recordStatus").classList.remove("d-none");
         })
         .catch(function (err) {
-          console.error("Error accessing microphone: " + err);
+          alert("Error: " + err);
         });
     };
 
+    // Tombol stop rekam
     document.getElementById("stopBtn").onclick = function () {
       if (recorder) {
         recorder.stop();
         mediaStream.getTracks().forEach(track => track.stop());
+
         document.getElementById("recordBtn").disabled = false;
         document.getElementById("stopBtn").disabled = true;
+        document.getElementById("recordStatus").classList.add("d-none");
+
+        recorder.onstop = function () {
+          let audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          let audioURL = URL.createObjectURL(audioBlob);
+
+          // Tampilkan audio player
+          let audioPlayer = document.getElementById("audioPlayer");
+          audioPlayer.src = audioURL;
+          audioPlayer.classList.remove("d-none");
+
+          // Upload rekaman ke backend
+          uploadAudio(audioBlob);
+        };
       }
     };
+
+    // Fungsi untuk mengunggah audio ke backend
+    function uploadAudio(audioBlob) {
+      let formData = new FormData();
+      formData.append("audio_file", audioBlob, "recorded_audio.wav");
+
+      document.getElementById("uploadStatus").classList.remove("d-none");
+
+      fetch("psoapie.php", {
+        method: "POST",
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("uploadStatus").classList.add("d-none");
+
+          // Tampilkan hasil transkripsi
+          document.getElementById("transcriptionResult").classList.remove("d-none");
+          document.getElementById("transcribedText").innerText = data.transcribed_text;
+
+          // Isi otomatis form SOAPIE berdasarkan hasil AI
+          if (data.soapie_classification) {
+            document.getElementById("subjective").value = data.soapie_classification.Subjective || "";
+            document.getElementById("objective").value = data.soapie_classification.Objective || "";
+            document.getElementById("assessment").value = data.soapie_classification.Assessment || "";
+            document.getElementById("instruksi").value = data.soapie_classification.Instruksi || "";
+            document.getElementById("evaluasi").value = data.soapie_classification.Evaluasi || "";
+            document.getElementById("plan").value = data.soapie_classification.Plan || "";
+          }
+        })
+        .catch(error => {
+          alert("Gagal mengunggah rekaman: " + error);
+        });
+    }
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
