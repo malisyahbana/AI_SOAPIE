@@ -9,7 +9,7 @@ classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnl
 text = sys.argv[1]
 
 # Daftar kategori SOAPIE
-soapie_labels = ["Subjective", "Objective", "Assessment", "Plan"]
+soapie_labels = ["Subjective", "Objective", "Assessment", "Plan", "Instruksi", "Evaluasi"]
 
 # Klasifikasikan teks ke dalam kategori SOAPIE
 result = classifier(text, candidate_labels=soapie_labels)
